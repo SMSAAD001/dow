@@ -5,7 +5,6 @@ import os
 import logging
 from datetime import datetime
 import shutil
-from typing import Optional, Tuple
 import re
 import urllib.error
 
@@ -19,8 +18,6 @@ logger = logging.getLogger(__name__)
 
 # Constants
 DOWNLOAD_PATH = "downloads"
-VALID_RESOLUTIONS = ["Auto", "1080p", "720p", "480p", "360p"]
-DEFAULT_RESOLUTION = "Auto"
 
 class YouTubeDownloader:
     def __init__(self):
@@ -29,7 +26,7 @@ class YouTubeDownloader:
 
     def _configure_streamlit(self) -> None:
         st.set_page_config(
-            page_title="Professional YouTube Downloader",
+            page_title="YouTube Downloader",
             page_icon="🎥",
             layout="wide",
             initial_sidebar_state="expanded"
@@ -84,29 +81,17 @@ class YouTubeDownloader:
                 "publish_date": "N/A"
             }
 
-    def _download_video(self, url: str, resolution: str) -> Tuple[bool, str]:
+    def _download_video(self, url: str) -> tuple[bool, str]:
         try:
             clean_url = self._clean_url(url)
             yt = YouTube(clean_url)
             yt.check_availability()
             
-            if resolution == "Auto":
-                stream = yt.streams.filter(
-                    file_extension='mp4',
-                    progressive=True
-                ).order_by('resolution').desc().first()
-            else:
-                stream = yt.streams.filter(
-                    resolution=resolution,
-                    file_extension='mp4',
-                    progressive=True
-                ).first()
-                if not stream:
-                    logger.warning(f"No {resolution} stream found, falling back to highest available")
-                    stream = yt.streams.filter(
-                        file_extension='mp4',
-                        progressive=True
-                    ).order_by('resolution').desc().first()
+            # Get highest available progressive stream
+            stream = yt.streams.filter(
+                file_extension='mp4',
+                progressive=True
+            ).order_by('resolution').desc().first()
 
             if stream:
                 title = yt.title if yt.title else f"video_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -132,15 +117,10 @@ class YouTubeDownloader:
             return False, f"Unexpected error: {str(e)}"
 
     def run(self) -> None:
-        st.title("Professional YouTube Downloader 🎥")
+        st.title("YouTube Downloader 🎥")
         
         with st.sidebar:
-            st.header("Settings")
-            resolution = st.selectbox(
-                "Select Resolution",
-                options=VALID_RESOLUTIONS,
-                index=VALID_RESOLUTIONS.index(DEFAULT_RESOLUTION)
-            )
+            st.header("Options")
             clear_downloads = st.button("Clear Downloads")
             show_debug = st.checkbox("Show Debug Info")
 
@@ -182,11 +162,11 @@ class YouTubeDownloader:
 
                     force_download = st.checkbox("Force download (if metadata unavailable)")
                     if st.button("Download Now", key="download_now"):
-                        with st.spinner(f"Downloading in {resolution}..."):
-                            success, message = self._download_video(url, resolution)
+                        with st.spinner("Downloading highest available quality..."):
+                            success, message = self._download_video(url)
                             if success:
                                 st.success(f"Downloaded successfully to: {message}")
-                                logger.info(f"Video downloaded: {video_info['title']} - {resolution}")
+                                logger.info(f"Video downloaded: {video_info['title']}")
                             else:
                                 st.error(message)
                                 logger.error(f"Download failed: {message}")
@@ -197,7 +177,7 @@ class YouTubeDownloader:
         st.markdown("---")
         st.markdown("""
         *Note: Please ensure you have permission to download videos and respect copyright laws.*
-        *'Auto' resolution selects the highest available quality. If metadata fails, try force download.*
+        *Downloads the highest available quality automatically. If metadata fails, try force download.*
         """)
 
 if __name__ == "__main__":
